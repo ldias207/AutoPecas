@@ -1,45 +1,60 @@
 # AutoPeças
 
-Sistema de gestão de estoque e vendas em evolução para uso desktop e acesso futuro por API/web.
+Sistema web-first para gestão de estoque, vendas e financeiro com controle de acesso por perfil de usuário.
 
-## Componentes e documentação
+## Visão geral
 
-- **Core desktop (Tkinter):** cadastro e manutenção de produtos, consulta de estoque, registro de vendas, relatórios financeiros, usuários e persistência SQLite. Manual de telas e histórico: [documentacao_core.docx](documentacao_core.docx).
-- **API HTTP (FastAPI):** serviço separado para autenticação e acesso por clientes web/móveis. Endpoints, perfis, configuração local e histórico: [docs/api.md](docs/api.md).
+A aplicação principal agora é a versão web via FastAPI. O navegador é a interface oficial para vendedor e administrador, e o acesso aos módulos é controlado por permissões do usuário.
 
-Cada componente mantém sua documentação e histórico de alterações próprios. Este README é o ponto de entrada e reúne apenas instruções compartilhadas.
-O antigo manual unificado foi preservado como [documentacao_telas_autopecas_legado.docx](documentacao_telas_autopecas_legado.docx); use os documentos acima para a referência atual.
+- **Web app principal:** consulta de estoque, registro de vendas, relatórios financeiros, cadastro de produtos para admin e controle de usuários.
+- **Tkinter:** mantido apenas como legado ou ferramenta auxiliar; não é a interface principal de uso.
+- **Banco de dados:** SQLite em ambiente local/teste e preparação para PostgreSQL em produção.
 
-## Requisitos e execução do Core
+## Arquitetura atual
 
-Python 3.14 ou compatível com as dependências do projeto. O Core usa Tkinter, SQLite local e arquivos JSON legados apenas como origem da migração inicial.
+- **API:** [api.py](api.py)
+- **Autenticação e permissões:** [auth.py](auth.py)
+- **Persistência e regras de negócio:** [database.py](database.py)
+- **Frontend web:** [static/index.html](static/index.html)
+- **Documentação da API:** [docs/api.md](docs/api.md)
 
-```powershell
-.venv\Scripts\python.exe main.py
-```
+## Fluxo de acesso por perfil
 
-O banco `autopecas.db` é criado na pasta do projeto. Na primeira inicialização, dados válidos dos JSON legados são importados uma única vez; os arquivos originais são preservados como backup.
+- **Administrador:** pode acessar vendas, financeiro e cadastro de produtos.
+- **Operador/Vendedor:** pode consultar estoque e registrar vendas.
 
-## Dependências da API
+As permissões são validadas no backend e também refletidas na navegação do front-end.
 
-Instale dependências a partir da raiz do repositório:
+## Requisitos e execução local
+
+Instale as dependências:
 
 ```powershell
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-A API também pode ser executada em produção como aplicação web. Para isso, use variáveis de ambiente e um serviço de hospedagem online. Consulte [docs/api.md](docs/api.md) para execução, configuração, endpoints, permissões e requisitos antes de hospedagem.
+Inicie a aplicação web:
 
-## Deploy em nuvem (recomendado para acesso do celular)
+```powershell
+.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8000
+```
 
-Quando os usuários não estão na mesma rede, a solução correta é publicar o app em um serviço web. O fluxo mais simples é:
+Acesse:
 
-1. subir o backend em um provedor como Render ou Railway;
-2. configurar uma variável `AUTOPECAS_TOKEN_SECRET` forte;
-3. manter o banco em SQLite para teste ou migrar para PostgreSQL em produção;
-4. enviar a URL pública para o usuário acessar pelo navegador do celular.
+```text
+http://127.0.0.1:8000/
+```
 
-Exemplo de variáveis para ambiente:
+## Deploy em nuvem
+
+Para acesso externo, a aplicação deve ser hospedada em um serviço web, como Render ou Railway. A configuração recomendada é:
+
+1. usar a API FastAPI como aplicação principal;
+2. definir `AUTOPECAS_TOKEN_SECRET`;
+3. configurar a variável `PORT`;
+4. manter a URL pública do app para acesso do celular/usuários remotos.
+
+Exemplo de variáveis de ambiente:
 
 ```bash
 AUTOPECAS_DATABASE=autopecas.db
@@ -47,42 +62,33 @@ AUTOPECAS_TOKEN_SECRET=sua-chave-secreta-forte
 PORT=8000
 ```
 
-Para deploy em Render, a configuração mais simples do serviço é usar o comando:
+Para deploy do Render, o comando mais simples é:
 
 ```bash
-gunicorn api:app --workers 2 --bind 0.0.0.0:$PORT
+uvicorn api:app --host 0.0.0.0 --port $PORT
 ```
-
-O arquivo `Procfile` do projeto já usa esse comando para facilitar o deploy.
 
 ## Regras compartilhadas
 
 - Estoque é controlado por unidades; zero unidades significa `Esgotado`, e quantidade positiva significa `Disponível`.
 - Operadores consultam estoque e registram vendas; administradores também mantêm produtos, consultam relatórios financeiros e gerenciam usuários.
 - O registro da venda e a redução do estoque acontecem na mesma transação.
-- Vendas novas registram produto, preço unitário praticado e usuário responsável. Dados antigos sem esses vínculos não recebem atribuições inventadas.
+- Vendas novas registram produto, preço unitário praticado e usuário responsável.
 
 ## Testes
 
-Execute toda a suíte:
+Execute a suíte relevante:
+
+```powershell
+.venv\Scripts\python.exe -m unittest tests.test_api tests.test_database
+```
+
+Ou a suíte completa:
 
 ```powershell
 .venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
 ```
 
-Testes específicos da API:
+## Observação sobre o Tkinter
 
-```powershell
-.venv\Scripts\python.exe -m unittest tests.test_api
-```
-
-## Atualizar documentação do Core
-
-Para regenerar as capturas e o manual do Core:
-
-```powershell
-.venv\Scripts\python.exe screenshots_telas.py
-.venv\Scripts\python.exe gerar_documentacao_telas.py
-```
-
-A documentação da API é mantida diretamente em `docs/api.md`.
+A interface desktop do Tkinter foi mantida apenas como base histórica/auxiliar. O sistema principal e o fluxo de uso real passam a ser o web, com acessos e permissões centralizados no backend.

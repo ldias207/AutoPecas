@@ -27,10 +27,10 @@
       place-items: center;
     }
     .app-shell {
-      width: min(420px, 92vw);
+      width: min(430px, 94vw);
       background: var(--panel);
-      border-radius: 18px;
-      padding: 32px 28px;
+      border-radius: 20px;
+      padding: 26px 22px 30px;
       box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
     }
     .brand {
@@ -52,6 +52,30 @@
     }
     .screen.active {
       display: block;
+    }
+    .top-nav {
+      display: flex;
+      gap: 10px;
+      margin: 0 0 18px;
+      padding: 6px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 12px;
+    }
+    .nav-button {
+      flex: 1;
+      margin-top: 0;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid transparent;
+      font-weight: 700;
+      transition: all 0.2s ease;
+    }
+    .nav-button.active {
+      background: linear-gradient(135deg, var(--primary), #2563eb);
+      color: white;
+      border-color: rgba(255,255,255,0.12);
+      box-shadow: 0 8px 18px rgba(59,130,246,0.28);
     }
     label {
       display: block;
@@ -93,14 +117,17 @@
       color: #fca5a5;
     }
     .panel {
-      background: var(--panel-soft);
-      border-radius: 12px;
-      padding: 18px;
+      background: linear-gradient(180deg, rgba(31,41,55,0.96), rgba(17,24,39,0.96));
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 14px;
+      padding: 18px 16px;
       margin-top: 18px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
     }
     .panel h2 {
       margin-top: 0;
       font-size: 1.1rem;
+      color: #f8fafc;
     }
     .product-list {
       list-style: none;
@@ -111,11 +138,25 @@
       display: flex;
       justify-content: space-between;
       gap: 12px;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+      padding: 12px 10px;
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.22);
+      margin-top: 8px;
     }
     .product-list li:last-child {
       border-bottom: none;
+    }
+    .admin-section {
+      margin-top: 18px;
+    }
+    .inline-grid {
+      display: grid;
+      gap: 8px;
+    }
+    .status {
+      border-radius: 8px;
+      padding: 4px 0;
     }
   </style>
 </head>
@@ -136,11 +177,17 @@
       <div id="login-status" class="status"></div>
     </section>
 
-    <section id="products-screen" class="screen">
+    <section id="vendas-screen" class="screen">
       <div class="brand">
         <h1>AutoPeças</h1>
         <span>Consulta de estoque</span>
       </div>
+
+      <nav id="app-nav" class="top-nav hidden">
+        <button id="nav-vendas" class="nav-button active" type="button">Vendas</button>
+        <button id="nav-financeiro" class="nav-button" type="button">Financeiro</button>
+      </nav>
+
       <div class="panel">
         <h2>Produtos disponíveis</h2>
         <input id="product-search" type="text" placeholder="Buscar por nome, marca ou categoria" />
@@ -157,8 +204,47 @@
         <div id="sale-status" class="status"></div>
       </div>
 
-      <div id="finance-panel" class="panel hidden">
-        <h2>Financeiro</h2>
+      <div id="admin-product-panel" class="panel admin-section hidden">
+        <h2>Gerenciar estoque</h2>
+        <div class="inline-grid">
+          <label for="product-name">Nome</label>
+          <input id="product-name" type="text" placeholder="Ex: Pastilha Bosch" />
+
+          <label for="product-brand">Marca</label>
+          <input id="product-brand" type="text" placeholder="Ex: Bosch" />
+
+          <label for="product-factory-number">Número de fábrica</label>
+          <input id="product-factory-number" type="text" placeholder="Ex: 12345" />
+
+          <label for="product-category">Categoria</label>
+          <input id="product-category" type="text" placeholder="Ex: Freio" />
+
+          <label for="product-quantity">Quantidade</label>
+          <input id="product-quantity" type="number" min="0" value="0" />
+
+          <label for="product-price">Preço unitário</label>
+          <input id="product-price" type="number" min="0" step="0.01" value="0" />
+        </div>
+        <button id="create-product-button">Cadastrar produto</button>
+        <div id="product-status" class="status"></div>
+      </div>
+
+      <button id="logout-button" class="secondary">Sair</button>
+    </section>
+
+    <section id="financeiro-screen" class="screen">
+      <div class="brand">
+        <h1>AutoPeças</h1>
+        <span>Financeiro</span>
+      </div>
+
+      <nav id="app-nav-finance" class="top-nav hidden">
+        <button id="nav-vendas-alt" class="nav-button" type="button">Vendas</button>
+        <button id="nav-financeiro-alt" class="nav-button active" type="button">Financeiro</button>
+      </nav>
+
+      <div class="panel">
+        <h2>Relatório de vendas</h2>
         <label for="finance-start">Data inicial</label>
         <input id="finance-start" type="date" />
         <label for="finance-end">Data final</label>
@@ -168,13 +254,20 @@
         <ul id="finance-list" class="product-list"></ul>
       </div>
 
-      <button id="logout-button" class="secondary">Sair</button>
+      <button id="logout-button-finance" class="secondary">Sair</button>
     </section>
   </main>
 
   <script>
     const loginScreen = document.getElementById('login-screen');
-    const productsScreen = document.getElementById('products-screen');
+    const vendasScreen = document.getElementById('vendas-screen');
+    const financeiroScreen = document.getElementById('financeiro-screen');
+    const appNav = document.getElementById('app-nav');
+    const appNavFinance = document.getElementById('app-nav-finance');
+    const navVendas = document.getElementById('nav-vendas');
+    const navFinanceiro = document.getElementById('nav-financeiro');
+    const navVendasAlt = document.getElementById('nav-vendas-alt');
+    const navFinanceiroAlt = document.getElementById('nav-financeiro-alt');
     const loginStatus = document.getElementById('login-status');
     const usernameInput = document.getElementById('username');
     const passwordInput = document.getElementById('password');
@@ -183,7 +276,14 @@
     const selectedProductLabel = document.getElementById('selected-product-label');
     const saleQuantity = document.getElementById('sale-quantity');
     const saleStatus = document.getElementById('sale-status');
-    const financePanel = document.getElementById('finance-panel');
+    const productStatus = document.getElementById('product-status');
+    const adminProductPanel = document.getElementById('admin-product-panel');
+    const productNameInput = document.getElementById('product-name');
+    const productBrandInput = document.getElementById('product-brand');
+    const productFactoryNumberInput = document.getElementById('product-factory-number');
+    const productCategoryInput = document.getElementById('product-category');
+    const productQuantityInput = document.getElementById('product-quantity');
+    const productPriceInput = document.getElementById('product-price');
     const financeSummary = document.getElementById('finance-summary');
     const financeList = document.getElementById('finance-list');
     const financeStart = document.getElementById('finance-start');
@@ -194,6 +294,7 @@
     let selectedProductName = '';
     let selectedProduct = null;
     let currentUser = null;
+    let currentView = 'vendas';
 
     function setStatus(el, message, isError = false) {
       el.textContent = message;
@@ -201,8 +302,28 @@
     }
 
     function setScreen(screen) {
+      currentView = screen;
       loginScreen.classList.toggle('active', screen === 'login');
-      productsScreen.classList.toggle('active', screen === 'products');
+      vendasScreen.classList.toggle('active', screen === 'vendas');
+      financeiroScreen.classList.toggle('active', screen === 'financeiro');
+      navVendas.classList.toggle('active', screen === 'vendas');
+      navFinanceiro.classList.toggle('active', screen === 'financeiro');
+      navVendasAlt.classList.toggle('active', screen === 'vendas');
+      navFinanceiroAlt.classList.toggle('active', screen === 'financeiro');
+    }
+
+    function updateNavigation() {
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      appNav.classList.toggle('hidden', !currentUser);
+      appNavFinance.classList.toggle('hidden', !currentUser);
+      navFinanceiro.disabled = !isAdmin;
+      navFinanceiroAlt.disabled = !isAdmin;
+      navFinanceiro.classList.toggle('hidden', !isAdmin);
+      navFinanceiroAlt.classList.toggle('hidden', !isAdmin);
+      adminProductPanel.classList.toggle('hidden', !isAdmin);
+      if (!isAdmin && currentView === 'financeiro') {
+        setScreen('vendas');
+      }
     }
 
     function getToken() {
@@ -216,7 +337,7 @@
     function clearToken() {
       localStorage.removeItem(tokenKey);
       currentUser = null;
-      financePanel.classList.add('hidden');
+      updateNavigation();
     }
 
     async function apiFetch(url, options = {}) {
@@ -257,10 +378,11 @@
 
         saveToken(payload.access_token);
         currentUser = await apiFetch('/auth/me');
-        financePanel.classList.toggle('hidden', currentUser.role !== 'admin');
+        updateNavigation();
         setStatus(loginStatus, '');
         usernameInput.value = '';
         passwordInput.value = '';
+        setScreen('vendas');
         loadProducts();
       } catch (error) {
         setStatus(loginStatus, error.message, true);
@@ -293,7 +415,7 @@
         if (!data.length) {
           resetSelectedProduct();
           productsList.innerHTML = '<li><span>Nenhum produto encontrado.</span></li>';
-          setScreen('products');
+          setScreen('vendas');
           return;
         }
 
@@ -314,7 +436,7 @@
           resetSelectedProduct();
         }
 
-        setScreen('products');
+        setScreen('vendas');
       } catch (error) {
         setStatus(loginStatus, error.message, true);
         setScreen('login');
@@ -354,6 +476,54 @@
       }
     }
 
+    async function createProduct() {
+      const nome = productNameInput.value.trim();
+      const marca = productBrandInput.value.trim();
+      const numeroFabrica = productFactoryNumberInput.value.trim();
+      const categoria = productCategoryInput.value.trim();
+      const quantidade = Number(productQuantityInput.value);
+      const preco = Number(productPriceInput.value);
+
+      if (!nome || !marca || !numeroFabrica || !categoria) {
+        setStatus(productStatus, 'Preencha nome, marca, número de fábrica e categoria.', true);
+        return;
+      }
+      if (!Number.isFinite(quantidade) || quantidade < 0) {
+        setStatus(productStatus, 'Quantidade inválida.', true);
+        return;
+      }
+      if (!Number.isFinite(preco) || preco < 0) {
+        setStatus(productStatus, 'Preço inválido.', true);
+        return;
+      }
+
+      try {
+        await apiFetch('/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nome,
+            marca,
+            numero_fabrica: numeroFabrica,
+            categoria,
+            quantidade,
+            preco,
+          })
+        });
+
+        setStatus(productStatus, 'Produto cadastrado com sucesso.', false);
+        productNameInput.value = '';
+        productBrandInput.value = '';
+        productFactoryNumberInput.value = '';
+        productCategoryInput.value = '';
+        productQuantityInput.value = '0';
+        productPriceInput.value = '0';
+        loadProducts(productSearch.value.trim());
+      } catch (error) {
+        setStatus(productStatus, error.message, true);
+      }
+    }
+
     async function loadFinancialReport() {
       try {
         const params = new URLSearchParams();
@@ -389,13 +559,36 @@
       }
     }
 
+    navVendas.addEventListener('click', () => setScreen('vendas'));
+    navFinanceiro.addEventListener('click', () => {
+      if (currentUser && currentUser.role === 'admin') {
+        setScreen('financeiro');
+        loadFinancialReport();
+      }
+    });
+    navVendasAlt.addEventListener('click', () => setScreen('vendas'));
+    navFinanceiroAlt.addEventListener('click', () => {
+      if (currentUser && currentUser.role === 'admin') {
+        setScreen('financeiro');
+        loadFinancialReport();
+      }
+    });
+
     document.getElementById('login-button').addEventListener('click', login);
     document.getElementById('search-button').addEventListener('click', () => {
       loadProducts(productSearch.value.trim());
     });
     document.getElementById('sale-button').addEventListener('click', registerSale);
+    document.getElementById('create-product-button').addEventListener('click', createProduct);
     document.getElementById('finance-button').addEventListener('click', loadFinancialReport);
     document.getElementById('logout-button').addEventListener('click', () => {
+      clearToken();
+      resetSelectedProduct();
+      setStatus(loginStatus, '');
+      setStatus(saleStatus, '');
+      setScreen('login');
+    });
+    document.getElementById('logout-button-finance').addEventListener('click', () => {
       clearToken();
       resetSelectedProduct();
       setStatus(loginStatus, '');
@@ -409,11 +602,15 @@
       if (event.key === 'Enter') registerSale();
     });
 
+    appNav.classList.add('hidden');
+    appNavFinance.classList.add('hidden');
+
     if (getToken()) {
       apiFetch('/auth/me')
         .then((user) => {
           currentUser = user;
-          financePanel.classList.toggle('hidden', currentUser.role !== 'admin');
+          updateNavigation();
+          setScreen('vendas');
           loadProducts();
         })
         .catch(() => {
