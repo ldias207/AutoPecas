@@ -55,6 +55,22 @@ class TestAutopecasApi(unittest.TestCase):
         self.assertEqual(len(result.json()), 1)
         self.assertEqual(denied.status_code, 403)
 
+    def test_produto_preserva_preco_de_custo_e_preco_de_venda(self):
+        response = self.client.post("/products", json={
+            "nome": "Filtro",
+            "marca": "Bosch",
+            "numero_fabrica": "FI-21",
+            "categoria": "Motor",
+            "quantidade": 4,
+            "preco_custo": 12.5,
+            "preco": 19.9,
+        }, headers=self.headers(self.admin_token))
+        product = self.client.get("/products", headers=self.headers(self.operator_token)).json()[0]
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(product["preco_custo"], 12.5)
+        self.assertEqual(product["preco"], 19.9)
+
     def test_venda_registra_usuario_produto_preco_e_reduz_estoque(self):
         product = self.client.post(
             "/products",
@@ -82,6 +98,65 @@ class TestAutopecasApi(unittest.TestCase):
         self.assertEqual(stored["preco_unitario"], 19.9)
         self.assertEqual(stored["usuario"], "vendedor")
         self.assertEqual(updated_product["quantidade"], 2)
+
+    def test_pedido_com_multiplos_produtos_e_cliente(self):
+        headers = self.headers(self.admin_token)
+        products = []
+        for name, price, quantity in (("Filtro", 20, 5), ("Pastilha", 30, 4)):
+            products.append(self.client.post("/products", json={
+                "nome": name,
+                "marca": "Bosch",
+                "numero_fabrica": f"{name}-01",
+                "categoria": "Auto",
+                "quantidade": quantity,
+                "preco": price,
+            }, headers=headers).json())
+        customer = self.client.post(
+            "/customers", json={"nome": "Maria Silva", "telefone": "11999990000"}, headers=headers
+        )
+
+        order = self.client.post("/sales", json={
+            "cliente_id": customer.json()["id"],
+            "itens": [
+                {"produto_id": products[0]["id"], "quantidade": 2},
+                {"produto_id": products[1]["id"], "quantidade": 1},
+            ],
+        }, headers=self.headers(self.operator_token))
+        stored_sales = self.client.get("/sales", headers=self.headers(self.operator_token)).json()
+
+        self.assertEqual(customer.status_code, 201)
+        self.assertEqual(order.status_code, 201)
+        self.assertEqual(order.json()["valor_total"], 70)
+        self.assertEqual(order.json()["cliente_nome"], "Maria Silva")
+        self.assertEqual(len(order.json()["itens"]), 2)
+        self.assertEqual({sale["pedido_id"] for sale in stored_sales}, {order.json()["id"]})
+        self.assertEqual({sale["cliente_id"] for sale in stored_sales}, {customer.json()["id"]})
+        report = self.client.get("/reports/sales", headers=headers).json()
+        self.assertEqual(report["quantidade_vendas"], 1)
+        self.assertEqual(report["unidades_vendidas"], 3)
+        self.assertEqual(report["valor_total"], 70)
+
+    def test_pedido_invalido_nao_baixa_estoque_parcialmente(self):
+        headers = self.headers(self.admin_token)
+        first = self.client.post("/products", json={
+            "nome": "Filtro", "marca": "Bosch", "numero_fabrica": "F-1",
+            "categoria": "Auto", "quantidade": 5, "preco": 20,
+        }, headers=headers).json()
+        second = self.client.post("/products", json={
+            "nome": "Pastilha", "marca": "Bosch", "numero_fabrica": "P-1",
+            "categoria": "Auto", "quantidade": 1, "preco": 30,
+        }, headers=headers).json()
+
+        order = self.client.post("/sales", json={"itens": [
+            {"produto_id": first["id"], "quantidade": 2},
+            {"produto_id": second["id"], "quantidade": 2},
+        ]}, headers=self.headers(self.operator_token))
+        products = self.client.get("/products", headers=self.headers(self.operator_token)).json()
+        sales = self.client.get("/sales", headers=self.headers(self.operator_token)).json()
+
+        self.assertEqual(order.status_code, 409)
+        self.assertEqual([product["quantidade"] for product in products], [5, 1])
+        self.assertEqual(sales, [])
 
     def test_operador_nao_acessa_relatorio_financeiro(self):
         response = self.client.get("/reports/sales", headers=self.headers(self.operator_token))

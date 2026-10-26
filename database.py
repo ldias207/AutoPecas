@@ -44,6 +44,7 @@ class SQLiteRepository:
                     categoria TEXT NOT NULL,
                     quantidade INTEGER NOT NULL CHECK (quantidade >= 0),
                     preco REAL NOT NULL CHECK (preco >= 0),
+                    preco_custo REAL NOT NULL DEFAULT 0 CHECK (preco_custo >= 0),
                     status TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS vendas (
@@ -55,7 +56,8 @@ class SQLiteRepository:
                     status TEXT NOT NULL DEFAULT 'Disponível',
                     produto_id INTEGER REFERENCES pecas(id) ON DELETE SET NULL,
                     preco_unitario REAL,
-                    usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
+                    usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+                    pedido_id INTEGER REFERENCES pedidos(id) ON DELETE SET NULL
                 );
                 CREATE TABLE IF NOT EXISTS metadata (
                     chave TEXT PRIMARY KEY,
@@ -68,11 +70,27 @@ class SQLiteRepository:
                     role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
                     criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
+                CREATE TABLE IF NOT EXISTS clientes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nome TEXT NOT NULL,
+                    telefone TEXT NOT NULL DEFAULT '',
+                    criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS pedidos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
+                    cliente_nome TEXT NOT NULL DEFAULT 'Consumidor final',
+                    data TEXT NOT NULL,
+                    usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+                    valor_total REAL NOT NULL CHECK (valor_total >= 0)
+                );
                 """
             )
             self._ensure_column(connection, "vendas", "produto_id", "INTEGER REFERENCES pecas(id) ON DELETE SET NULL")
+            self._ensure_column(connection, "pecas", "preco_custo", "REAL NOT NULL DEFAULT 0 CHECK (preco_custo >= 0)")
             self._ensure_column(connection, "vendas", "preco_unitario", "REAL")
             self._ensure_column(connection, "vendas", "usuario_id", "INTEGER REFERENCES usuarios(id) ON DELETE SET NULL")
+            self._ensure_column(connection, "vendas", "pedido_id", "INTEGER REFERENCES pedidos(id) ON DELETE SET NULL")
             connection.execute(
                 "UPDATE vendas SET preco_unitario = valor_total / quantidade WHERE preco_unitario IS NULL AND quantidade > 0"
             )
@@ -172,6 +190,7 @@ class SQLiteRepository:
                 try:
                     quantity = int(part.get("quantidade", 0))
                     price = float(part.get("preco", 0))
+                    cost_price = float(part.get("preco_custo", 0))
                     fields = (
                         str(part.get("nome", "")).strip(),
                         str(part.get("marca", "")).strip(),
@@ -179,16 +198,17 @@ class SQLiteRepository:
                         str(part.get("categoria", "")).strip(),
                         quantity,
                         price,
+                        cost_price,
                         "Esgotado" if quantity <= 0 else "Disponível",
                     )
-                    if not all(fields[:4]) or not fields[6] or quantity < 0 or price < 0:
+                    if not all(fields[:4]) or not fields[7] or quantity < 0 or price < 0 or cost_price < 0:
                         continue
                 except (TypeError, ValueError):
                     continue
                 connection.execute(
                     """INSERT INTO pecas
-                    (nome, marca, numero_fabrica, categoria, quantidade, preco, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (nome, marca, numero_fabrica, categoria, quantidade, preco, preco_custo, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     fields,
                 )
 
@@ -232,12 +252,14 @@ class SQLiteRepository:
             "categoria": row["categoria"],
             "quantidade": row["quantidade"],
             "preco": row["preco"],
+            "preco_custo": row["preco_custo"],
             "status": row["status"],
         }
 
     @staticmethod
     def _sale_dict(row):
         return {
+            "id": row["id"],
             "nome": row["nome"],
             "quantidade": row["quantidade"],
             "valor_total": row["valor_total"],
@@ -247,7 +269,38 @@ class SQLiteRepository:
             "preco_unitario": row["preco_unitario"],
             "usuario_id": row["usuario_id"],
             "usuario": row["usuario"],
+            "pedido_id": row["pedido_id"] if "pedido_id" in row.keys() else None,
+            "cliente_id": row["cliente_id"] if "cliente_id" in row.keys() else None,
+            "cliente_nome": row["cliente_nome"] if "cliente_nome" in row.keys() else "Consumidor final",
         }
+
+    @staticmethod
+    def _customer_dict(row):
+        return {"id": row["id"], "nome": row["nome"], "telefone": row["telefone"]}
+
+    def create_customer(self, name, phone=""):
+        name = str(name).strip()
+        phone = str(phone or "").strip()
+        if not name:
+            return None
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "INSERT INTO clientes (nome, telefone) VALUES (?, ?)", (name, phone)
+            )
+            row = connection.execute("SELECT * FROM clientes WHERE id = ?", (cursor.lastrowid,)).fetchone()
+        return self._customer_dict(row)
+
+    def load_customers(self, query=""):
+        query = str(query or "").strip()
+        with self._connection() as connection:
+            if query:
+                rows = connection.execute(
+                    "SELECT * FROM clientes WHERE nome LIKE ? OR telefone LIKE ? ORDER BY nome COLLATE NOCASE",
+                    (f"%{query}%", f"%{query}%"),
+                ).fetchall()
+            else:
+                rows = connection.execute("SELECT * FROM clientes ORDER BY nome COLLATE NOCASE").fetchall()
+        return [self._customer_dict(row) for row in rows]
 
     def load_parts(self):
         with self._connection() as connection:
@@ -263,13 +316,14 @@ class SQLiteRepository:
             part["categoria"],
             quantity,
             float(part["preco"]),
+            float(part.get("preco_custo", 0)),
             "Esgotado" if quantity <= 0 else "Disponível",
         )
         with self._connection() as connection:
             cursor = connection.execute(
                 """INSERT INTO pecas
-                (nome, marca, numero_fabrica, categoria, quantidade, preco, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (nome, marca, numero_fabrica, categoria, quantidade, preco, preco_custo, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 fields,
             )
             row = connection.execute("SELECT * FROM pecas WHERE id = ?", (cursor.lastrowid,)).fetchone()
@@ -284,13 +338,14 @@ class SQLiteRepository:
             part["categoria"],
             quantity,
             float(part["preco"]),
+            float(part.get("preco_custo", 0)),
             "Esgotado" if quantity <= 0 else "Disponível",
             part_id,
         )
         with self._connection() as connection:
             cursor = connection.execute(
                 """UPDATE pecas SET nome = ?, marca = ?, numero_fabrica = ?, categoria = ?,
-                quantidade = ?, preco = ?, status = ? WHERE id = ?""",
+                quantidade = ?, preco = ?, preco_custo = ?, status = ? WHERE id = ?""",
                 fields,
             )
             if not cursor.rowcount:
@@ -306,8 +361,11 @@ class SQLiteRepository:
     def load_sales(self):
         with self._connection() as connection:
             rows = connection.execute(
-                """SELECT vendas.*, usuarios.username AS usuario
-                FROM vendas LEFT JOIN usuarios ON usuarios.id = vendas.usuario_id
+                """SELECT vendas.*, usuarios.username AS usuario,
+                pedidos.cliente_id, COALESCE(pedidos.cliente_nome, 'Consumidor final') AS cliente_nome
+                FROM vendas
+                LEFT JOIN usuarios ON usuarios.id = vendas.usuario_id
+                LEFT JOIN pedidos ON pedidos.id = vendas.pedido_id
                 ORDER BY vendas.id"""
             ).fetchall()
         return [self._sale_dict(row) for row in rows]
@@ -324,13 +382,14 @@ class SQLiteRepository:
                     part.get("categoria", ""),
                     quantity,
                     float(part.get("preco", 0)),
+                    float(part.get("preco_custo", 0)),
                     "Esgotado" if quantity <= 0 else "Disponível",
                 )
                 part_id = part.get("id")
                 if part_id is not None:
                     cursor = connection.execute(
                         """UPDATE pecas SET nome = ?, marca = ?, numero_fabrica = ?, categoria = ?,
-                        quantidade = ?, preco = ?, status = ? WHERE id = ?""",
+                        quantidade = ?, preco = ?, preco_custo = ?, status = ? WHERE id = ?""",
                         (*fields, part_id),
                     )
                     if cursor.rowcount:
@@ -338,8 +397,8 @@ class SQLiteRepository:
                         continue
                 cursor = connection.execute(
                     """INSERT INTO pecas
-                    (nome, marca, numero_fabrica, categoria, quantidade, preco, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (nome, marca, numero_fabrica, categoria, quantidade, preco, preco_custo, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     fields,
                 )
                 part["id"] = cursor.lastrowid
@@ -369,51 +428,85 @@ class SQLiteRepository:
                 ],
             )
 
-    def register_sale(self, part_id, quantity, user_id):
+    def register_order(self, items, user_id, customer_id=None):
+        quantities = {}
+        try:
+            for item in items:
+                part_id = int(item["produto_id"])
+                quantity = int(item["quantidade"])
+                if part_id <= 0 or quantity <= 0:
+                    return None
+                quantities[part_id] = quantities.get(part_id, 0) + quantity
+        except (KeyError, TypeError, ValueError):
+            return None
+        if not quantities:
+            return None
+
         with self._connection() as connection:
-            row = connection.execute("SELECT * FROM pecas WHERE id = ?", (part_id,)).fetchone()
-            if not row:
-                return None
+            customer = None
+            if customer_id is not None:
+                customer = connection.execute("SELECT * FROM clientes WHERE id = ?", (customer_id,)).fetchone()
+                if not customer:
+                    return None
 
-            part = self._part_dict(row)
-            try:
-                quantity = int(quantity)
-                current_quantity = int(part["quantidade"])
-                price = float(part["preco"])
-            except (TypeError, ValueError):
-                return None
-            if quantity <= 0 or quantity > current_quantity:
-                return None
+            order_lines = []
+            for part_id, quantity in quantities.items():
+                row = connection.execute("SELECT * FROM pecas WHERE id = ?", (part_id,)).fetchone()
+                if not row or quantity > int(row["quantidade"]):
+                    return None
+                price = float(row["preco"])
+                order_lines.append({
+                    "produto_id": part_id,
+                    "nome": row["nome"],
+                    "quantidade": quantity,
+                    "preco_unitario": price,
+                    "valor_total": round(price * quantity, 2),
+                })
 
-            remaining = current_quantity - quantity
-            new_status = "Esgotado" if remaining <= 0 else "Disponível"
-            sale = {
-                "nome": part["nome"],
-                "quantidade": quantity,
-                "valor_total": round(price * quantity, 2),
-                "preco_unitario": price,
-                "data": date.today().isoformat(),
-                "status": new_status,
-                "produto_id": part_id,
-                "usuario_id": user_id,
-            }
-            connection.execute(
-                """UPDATE pecas SET quantidade = ?, status = ? WHERE id = ?""",
-                (remaining, new_status, part_id),
+            order_total = round(sum(line["valor_total"] for line in order_lines), 2)
+            order_date = date.today().isoformat()
+            customer_name = customer["nome"] if customer else "Consumidor final"
+            cursor = connection.execute(
+                """INSERT INTO pedidos (cliente_id, cliente_nome, data, usuario_id, valor_total)
+                VALUES (?, ?, ?, ?, ?)""",
+                (customer_id, customer_name, order_date, user_id, order_total),
             )
-            connection.execute(
-                """INSERT INTO vendas
-                (nome, quantidade, valor_total, data, status, produto_id, preco_unitario, usuario_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    sale["nome"],
-                    sale["quantidade"],
-                    sale["valor_total"],
-                    sale["data"],
-                    sale["status"],
-                    sale["produto_id"],
-                    sale["preco_unitario"],
-                    sale["usuario_id"],
-                ),
-            )
-            return sale
+            order_id = cursor.lastrowid
+
+            for line in order_lines:
+                current = connection.execute(
+                    "SELECT quantidade FROM pecas WHERE id = ?", (line["produto_id"],)
+                ).fetchone()["quantidade"]
+                remaining = current - line["quantidade"]
+                status = "Esgotado" if remaining <= 0 else "Disponível"
+                line.update({
+                    "status": status,
+                    "data": order_date,
+                    "usuario_id": user_id,
+                    "pedido_id": order_id,
+                })
+                connection.execute(
+                    "UPDATE pecas SET quantidade = ?, status = ? WHERE id = ?",
+                    (remaining, status, line["produto_id"]),
+                )
+                connection.execute(
+                    """INSERT INTO vendas
+                    (nome, quantidade, valor_total, data, status, produto_id, preco_unitario, usuario_id, pedido_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (line["nome"], line["quantidade"], line["valor_total"], order_date, status,
+                     line["produto_id"], line["preco_unitario"], user_id, order_id),
+                )
+
+        return {
+            "id": order_id,
+            "cliente_id": customer_id,
+            "cliente_nome": customer_name,
+            "data": order_date,
+            "usuario_id": user_id,
+            "valor_total": order_total,
+            "itens": order_lines,
+        }
+
+    def register_sale(self, part_id, quantity, user_id):
+        order = self.register_order([{"produto_id": part_id, "quantidade": quantity}], user_id)
+        return order["itens"][0] if order else None

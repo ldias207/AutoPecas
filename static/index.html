@@ -33,6 +33,9 @@
       padding: 26px 22px 30px;
       box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
     }
+    .app-shell:has(#vendas-screen.active) {
+      width: min(1040px, 96vw);
+    }
     .brand {
       text-align: center;
       margin-bottom: 24px;
@@ -158,6 +161,66 @@
       border-radius: 8px;
       padding: 4px 0;
     }
+    .sale-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .product-list button {
+      width: auto;
+      min-width: 108px;
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 8px 10px;
+    }
+    .product-list li > span {
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow-wrap: anywhere;
+    }
+    .cart-row {
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+    .cart-row input {
+      width: 72px;
+      flex: 0 0 72px;
+      padding: 8px;
+    }
+    .cart-row strong {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+    .cart-row button {
+      width: auto;
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 7px 10px;
+      background: #b91c1c;
+    }
+    .customer-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+    .customer-form button {
+      width: auto;
+      margin: 0;
+      white-space: nowrap;
+    }
+    @media (max-width: 760px) {
+      .sale-layout, .customer-form {
+        grid-template-columns: 1fr;
+      }
+      .product-list li {
+        flex-wrap: wrap;
+      }
+      .cart-row {
+        flex-wrap: wrap;
+      }
+    }
   </style>
 </head>
 <body>
@@ -185,27 +248,71 @@
 
       <nav id="app-nav" class="top-nav hidden">
         <button id="nav-vendas" class="nav-button active" type="button">Vendas</button>
+        <button id="nav-produtos" class="nav-button hidden" type="button">Produtos</button>
         <button id="nav-financeiro" class="nav-button" type="button">Financeiro</button>
       </nav>
 
-      <div class="panel">
-        <h2>Produtos disponíveis</h2>
-        <input id="product-search" type="text" placeholder="Buscar por nome, marca ou categoria" />
-        <button id="search-button">Buscar</button>
-        <ul id="products-list" class="product-list"></ul>
+      <div class="sale-layout">
+        <div class="panel">
+          <h2>Escolher produtos</h2>
+          <input id="product-search" type="search" placeholder="Buscar por nome, marca ou categoria" />
+          <button id="search-button">Buscar</button>
+          <ul id="products-list" class="product-list">
+            <li><span>Use a pesquisa para carregar produtos.</span></li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="panel">
+            <h2>Cliente</h2>
+            <label for="sale-customer">Vincular cliente</label>
+            <select id="sale-customer">
+              <option value="">Consumidor final</option>
+            </select>
+            <details>
+              <summary>Cadastrar novo cliente</summary>
+              <div class="customer-form">
+                <div>
+                  <label for="customer-name">Nome</label>
+                  <input id="customer-name" type="text" placeholder="Nome da pessoa" />
+                </div>
+                <div>
+                  <label for="customer-phone">Telefone</label>
+                  <input id="customer-phone" type="tel" placeholder="(00) 00000-0000" />
+                </div>
+                <button id="create-customer-button" type="button">Salvar cliente</button>
+              </div>
+              <div id="customer-status" class="status"></div>
+            </details>
+          </div>
+
+          <div class="panel">
+            <h2>Carrinho</h2>
+            <ul id="cart-list" class="product-list"></ul>
+            <div id="cart-total"><strong>Total: R$ 0,00</strong></div>
+            <button id="sale-button" type="button">Finalizar venda</button>
+            <div id="sale-status" class="status"></div>
+          </div>
+        </div>
       </div>
 
-      <div class="panel">
-        <h2>Registrar venda</h2>
-        <div id="selected-product-label">Produto: nenhum</div>
-        <label for="sale-quantity">Quantidade</label>
-        <input id="sale-quantity" type="number" min="1" value="1" />
-        <button id="sale-button">Registrar venda</button>
-        <div id="sale-status" class="status"></div>
+      <button id="logout-button" class="secondary">Sair</button>
+    </section>
+
+    <section id="produtos-screen" class="screen">
+      <div class="brand">
+        <h1>AutoPeças</h1>
+        <span>Produtos</span>
       </div>
+
+      <nav id="app-nav-products" class="top-nav hidden">
+        <button id="nav-vendas-products" class="nav-button" type="button">Vendas</button>
+        <button id="nav-produtos-products" class="nav-button active" type="button">Produtos</button>
+        <button id="nav-financeiro-products" class="nav-button" type="button">Financeiro</button>
+      </nav>
 
       <div id="admin-product-panel" class="panel admin-section hidden">
-        <h2>Gerenciar estoque</h2>
+        <h2>Cadastrar produto</h2>
         <div class="inline-grid">
           <label for="product-name">Nome</label>
           <input id="product-name" type="text" placeholder="Ex: Pastilha Bosch" />
@@ -222,14 +329,17 @@
           <label for="product-quantity">Quantidade</label>
           <input id="product-quantity" type="number" min="0" value="0" />
 
-          <label for="product-price">Preço unitário</label>
+          <label for="product-cost-price">Preço de custo</label>
+          <input id="product-cost-price" type="number" min="0" step="0.01" value="0" />
+
+          <label for="product-price">Preço de venda</label>
           <input id="product-price" type="number" min="0" step="0.01" value="0" />
         </div>
         <button id="create-product-button">Cadastrar produto</button>
         <div id="product-status" class="status"></div>
       </div>
 
-      <button id="logout-button" class="secondary">Sair</button>
+      <button id="logout-button-products" class="secondary">Sair</button>
     </section>
 
     <section id="financeiro-screen" class="screen">
@@ -240,6 +350,7 @@
 
       <nav id="app-nav-finance" class="top-nav hidden">
         <button id="nav-vendas-alt" class="nav-button" type="button">Vendas</button>
+        <button id="nav-produtos-finance" class="nav-button hidden" type="button">Produtos</button>
         <button id="nav-financeiro-alt" class="nav-button active" type="button">Financeiro</button>
       </nav>
 
@@ -261,20 +372,31 @@
   <script>
     const loginScreen = document.getElementById('login-screen');
     const vendasScreen = document.getElementById('vendas-screen');
+    const produtosScreen = document.getElementById('produtos-screen');
     const financeiroScreen = document.getElementById('financeiro-screen');
     const appNav = document.getElementById('app-nav');
+    const appNavProducts = document.getElementById('app-nav-products');
     const appNavFinance = document.getElementById('app-nav-finance');
     const navVendas = document.getElementById('nav-vendas');
+    const navProdutos = document.getElementById('nav-produtos');
     const navFinanceiro = document.getElementById('nav-financeiro');
     const navVendasAlt = document.getElementById('nav-vendas-alt');
+    const navProdutosProducts = document.getElementById('nav-produtos-products');
+    const navFinanceiroProducts = document.getElementById('nav-financeiro-products');
+    const navVendasProducts = document.getElementById('nav-vendas-products');
+    const navProdutosFinance = document.getElementById('nav-produtos-finance');
     const navFinanceiroAlt = document.getElementById('nav-financeiro-alt');
     const loginStatus = document.getElementById('login-status');
     const usernameInput = document.getElementById('username');
     const passwordInput = document.getElementById('password');
     const productSearch = document.getElementById('product-search');
     const productsList = document.getElementById('products-list');
-    const selectedProductLabel = document.getElementById('selected-product-label');
-    const saleQuantity = document.getElementById('sale-quantity');
+    const cartList = document.getElementById('cart-list');
+    const cartTotal = document.getElementById('cart-total');
+    const saleCustomer = document.getElementById('sale-customer');
+    const customerNameInput = document.getElementById('customer-name');
+    const customerPhoneInput = document.getElementById('customer-phone');
+    const customerStatus = document.getElementById('customer-status');
     const saleStatus = document.getElementById('sale-status');
     const productStatus = document.getElementById('product-status');
     const adminProductPanel = document.getElementById('admin-product-panel');
@@ -283,6 +405,7 @@
     const productFactoryNumberInput = document.getElementById('product-factory-number');
     const productCategoryInput = document.getElementById('product-category');
     const productQuantityInput = document.getElementById('product-quantity');
+    const productCostPriceInput = document.getElementById('product-cost-price');
     const productPriceInput = document.getElementById('product-price');
     const financeSummary = document.getElementById('finance-summary');
     const financeList = document.getElementById('finance-list');
@@ -290,9 +413,7 @@
     const financeEnd = document.getElementById('finance-end');
 
     const tokenKey = 'autopecas-token';
-    let selectedProductId = null;
-    let selectedProductName = '';
-    let selectedProduct = null;
+    const cart = new Map();
     let currentUser = null;
     let currentView = 'vendas';
 
@@ -305,23 +426,36 @@
       currentView = screen;
       loginScreen.classList.toggle('active', screen === 'login');
       vendasScreen.classList.toggle('active', screen === 'vendas');
+      produtosScreen.classList.toggle('active', screen === 'produtos');
       financeiroScreen.classList.toggle('active', screen === 'financeiro');
       navVendas.classList.toggle('active', screen === 'vendas');
+      navProdutos.classList.toggle('active', screen === 'produtos');
       navFinanceiro.classList.toggle('active', screen === 'financeiro');
       navVendasAlt.classList.toggle('active', screen === 'vendas');
+      navProdutosProducts.classList.toggle('active', screen === 'produtos');
+      navFinanceiroProducts.classList.toggle('active', screen === 'financeiro');
+      navVendasProducts.classList.toggle('active', screen === 'vendas');
+      navProdutosFinance.classList.toggle('active', screen === 'produtos');
       navFinanceiroAlt.classList.toggle('active', screen === 'financeiro');
     }
 
     function updateNavigation() {
       const isAdmin = currentUser && currentUser.role === 'admin';
       appNav.classList.toggle('hidden', !currentUser);
+      appNavProducts.classList.toggle('hidden', !currentUser);
       appNavFinance.classList.toggle('hidden', !currentUser);
+      navProdutos.classList.toggle('hidden', !isAdmin);
+      navProdutosFinance.classList.toggle('hidden', !isAdmin);
+      navProdutosProducts.classList.toggle('hidden', !isAdmin);
       navFinanceiro.disabled = !isAdmin;
+      navProdutos.disabled = !isAdmin;
       navFinanceiroAlt.disabled = !isAdmin;
+      navProdutosFinance.disabled = !isAdmin;
+      navProdutosProducts.disabled = !isAdmin;
       navFinanceiro.classList.toggle('hidden', !isAdmin);
       navFinanceiroAlt.classList.toggle('hidden', !isAdmin);
       adminProductPanel.classList.toggle('hidden', !isAdmin);
-      if (!isAdmin && currentView === 'financeiro') {
+      if (!isAdmin && ['financeiro', 'produtos'].includes(currentView)) {
         setScreen('vendas');
       }
     }
@@ -383,29 +517,94 @@
         usernameInput.value = '';
         passwordInput.value = '';
         setScreen('vendas');
-        loadProducts();
+        productsList.innerHTML = '<li><span>Use a pesquisa para carregar produtos.</span></li>';
+        loadCustomers();
       } catch (error) {
         setStatus(loginStatus, error.message, true);
       }
     }
 
-    function resetSelectedProduct() {
-      selectedProductId = null;
-      selectedProductName = '';
-      selectedProduct = null;
-      selectedProductLabel.textContent = 'Produto: nenhum';
-      saleQuantity.value = '1';
-      saleQuantity.removeAttribute('max');
+    function renderCart() {
+      cartList.innerHTML = '';
+      let total = 0;
+      cart.forEach((entry, productId) => {
+        const lineTotal = Number(entry.product.preco) * entry.quantity;
+        total += lineTotal;
+        const li = document.createElement('li');
+        li.className = 'cart-row';
+        const title = document.createElement('span');
+        title.textContent = `${entry.product.nome} · R$ ${Number(entry.product.preco).toFixed(2)}`;
+        const quantity = document.createElement('input');
+        quantity.type = 'number';
+        quantity.min = '1';
+        quantity.max = String(entry.product.quantidade);
+        quantity.value = String(entry.quantity);
+        quantity.setAttribute('aria-label', `Quantidade de ${entry.product.nome}`);
+        quantity.addEventListener('change', () => {
+          const nextQuantity = Number(quantity.value);
+          if (!Number.isInteger(nextQuantity) || nextQuantity < 1 || nextQuantity > entry.product.quantidade) {
+            quantity.value = String(entry.quantity);
+            setStatus(saleStatus, `Estoque de ${entry.product.nome}: ${entry.product.quantidade} unidade(s).`, true);
+            return;
+          }
+          entry.quantity = nextQuantity;
+          setStatus(saleStatus, '');
+          renderCart();
+        });
+        const subtotal = document.createElement('strong');
+        subtotal.textContent = `R$ ${lineTotal.toFixed(2)}`;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = 'Remover';
+        remove.setAttribute('aria-label', `Remover ${entry.product.nome} do carrinho`);
+        remove.addEventListener('click', () => {
+          cart.delete(productId);
+          renderCart();
+        });
+        li.append(title, quantity, subtotal, remove);
+        cartList.appendChild(li);
+      });
+      if (!cart.size) {
+        cartList.innerHTML = '<li><span>Nenhum produto no carrinho.</span></li>';
+      }
+      cartTotal.innerHTML = `<strong>Total: R$ ${total.toFixed(2)}</strong>`;
     }
 
-    function selectProduct(product) {
-      selectedProductId = product.id;
-      selectedProductName = product.nome;
-      selectedProduct = product;
-      selectedProductLabel.textContent = `Produto: ${product.nome} (${product.quantidade} und.)`;
-      saleQuantity.value = '1';
-      saleQuantity.max = String(product.quantidade);
+    function addToCart(product) {
+      if (Number(product.quantidade) < 1) {
+        setStatus(saleStatus, `${product.nome} está sem estoque.`, true);
+        return;
+      }
+      const existing = cart.get(product.id);
+      if (existing && existing.quantity >= Number(product.quantidade)) {
+        setStatus(saleStatus, `Estoque máximo de ${product.nome}: ${product.quantidade} unidade(s).`, true);
+        return;
+      }
+      cart.set(product.id, {
+        product,
+        quantity: existing ? existing.quantity + 1 : 1,
+      });
       setStatus(saleStatus, '');
+      renderCart();
+    }
+
+    async function loadCustomers() {
+      try {
+        const customers = await apiFetch('/customers');
+        const selectedId = saleCustomer.value;
+        saleCustomer.innerHTML = '<option value="">Consumidor final</option>';
+        customers.forEach((customer) => {
+          const option = document.createElement('option');
+          option.value = String(customer.id);
+          option.textContent = customer.telefone ? `${customer.nome} · ${customer.telefone}` : customer.nome;
+          saleCustomer.appendChild(option);
+        });
+        if (customers.some((customer) => String(customer.id) === selectedId)) {
+          saleCustomer.value = selectedId;
+        }
+      } catch (error) {
+        setStatus(customerStatus, error.message, true);
+      }
     }
 
     async function loadProducts(query = '') {
@@ -413,30 +612,22 @@
         const data = await apiFetch(`/products?q=${encodeURIComponent(query)}`);
         productsList.innerHTML = '';
         if (!data.length) {
-          resetSelectedProduct();
           productsList.innerHTML = '<li><span>Nenhum produto encontrado.</span></li>';
-          setScreen('vendas');
           return;
         }
 
         data.forEach((item) => {
           const li = document.createElement('li');
-          li.style.cursor = 'pointer';
-          li.addEventListener('click', () => selectProduct(item));
           const left = document.createElement('span');
-          const right = document.createElement('strong');
-          left.textContent = `${item.nome} (${item.quantidade} und.)`;
-          right.textContent = item.status;
-          li.appendChild(left);
-          li.appendChild(right);
+          left.textContent = `${item.nome} · ${item.quantidade} und. · R$ ${Number(item.preco).toFixed(2)}`;
+          const add = document.createElement('button');
+          add.type = 'button';
+          add.textContent = Number(item.quantidade) > 0 ? 'Adicionar' : 'Sem estoque';
+          add.disabled = Number(item.quantidade) < 1;
+          add.addEventListener('click', () => addToCart(item));
+          li.append(left, add);
           productsList.appendChild(li);
         });
-
-        if (selectedProductId !== null && !data.some((item) => item.id === selectedProductId)) {
-          resetSelectedProduct();
-        }
-
-        setScreen('vendas');
       } catch (error) {
         setStatus(loginStatus, error.message, true);
         setScreen('login');
@@ -444,35 +635,48 @@
     }
 
     async function registerSale() {
-      if (!selectedProductId || !selectedProduct) {
-        setStatus(saleStatus, 'Selecione um produto antes de registrar a venda.', true);
-        return;
-      }
-
-      const quantity = Number(saleQuantity.value);
-      if (!Number.isInteger(quantity) || quantity <= 0) {
-        setStatus(saleStatus, 'Informe uma quantidade inteira maior que zero.', true);
-        return;
-      }
-
-      if (quantity > Number(selectedProduct.quantidade)) {
-        setStatus(saleStatus, `Quantidade indisponível. Estoque atual: ${selectedProduct.quantidade} unidade(s).`, true);
+      if (!cart.size) {
+        setStatus(saleStatus, 'Adicione pelo menos um produto ao carrinho.', true);
         return;
       }
 
       try {
+        const items = Array.from(cart, ([produto_id, entry]) => ({ produto_id, quantidade: entry.quantity }));
+        const clienteId = saleCustomer.value ? Number(saleCustomer.value) : null;
         const response = await apiFetch('/sales', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ produto_id: selectedProductId, quantidade: quantity })
+          body: JSON.stringify({ itens: items, cliente_id: clienteId })
         });
 
-        setStatus(saleStatus, `Venda registrada: ${response.nome} | ${response.quantidade} unidade(s).`, false);
-        saleQuantity.value = '1';
-        resetSelectedProduct();
-        loadProducts(productSearch.value.trim());
+        setStatus(saleStatus, `Venda #${response.id} para ${response.cliente_nome}: R$ ${Number(response.valor_total).toFixed(2)}.`, false);
+        cart.clear();
+        renderCart();
       } catch (error) {
         setStatus(saleStatus, error.message, true);
+      }
+    }
+
+    async function createCustomer() {
+      const nome = customerNameInput.value.trim();
+      const telefone = customerPhoneInput.value.trim();
+      if (!nome) {
+        setStatus(customerStatus, 'Informe o nome do cliente.', true);
+        return;
+      }
+      try {
+        const customer = await apiFetch('/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, telefone }),
+        });
+        await loadCustomers();
+        saleCustomer.value = String(customer.id);
+        customerNameInput.value = '';
+        customerPhoneInput.value = '';
+        setStatus(customerStatus, 'Cliente cadastrado e selecionado.', false);
+      } catch (error) {
+        setStatus(customerStatus, error.message, true);
       }
     }
 
@@ -482,6 +686,7 @@
       const numeroFabrica = productFactoryNumberInput.value.trim();
       const categoria = productCategoryInput.value.trim();
       const quantidade = Number(productQuantityInput.value);
+      const precoCusto = Number(productCostPriceInput.value);
       const preco = Number(productPriceInput.value);
 
       if (!nome || !marca || !numeroFabrica || !categoria) {
@@ -492,8 +697,12 @@
         setStatus(productStatus, 'Quantidade inválida.', true);
         return;
       }
+      if (!Number.isFinite(precoCusto) || precoCusto < 0) {
+        setStatus(productStatus, 'Preço de custo inválido.', true);
+        return;
+      }
       if (!Number.isFinite(preco) || preco < 0) {
-        setStatus(productStatus, 'Preço inválido.', true);
+        setStatus(productStatus, 'Preço de venda inválido.', true);
         return;
       }
 
@@ -507,6 +716,7 @@
             numero_fabrica: numeroFabrica,
             categoria,
             quantidade,
+            preco_custo: precoCusto,
             preco,
           })
         });
@@ -517,8 +727,8 @@
         productFactoryNumberInput.value = '';
         productCategoryInput.value = '';
         productQuantityInput.value = '0';
+        productCostPriceInput.value = '0';
         productPriceInput.value = '0';
-        loadProducts(productSearch.value.trim());
       } catch (error) {
         setStatus(productStatus, error.message, true);
       }
@@ -560,6 +770,9 @@
     }
 
     navVendas.addEventListener('click', () => setScreen('vendas'));
+    navProdutos.addEventListener('click', () => {
+      if (currentUser && currentUser.role === 'admin') setScreen('produtos');
+    });
     navFinanceiro.addEventListener('click', () => {
       if (currentUser && currentUser.role === 'admin') {
         setScreen('financeiro');
@@ -567,6 +780,19 @@
       }
     });
     navVendasAlt.addEventListener('click', () => setScreen('vendas'));
+    navVendasProducts.addEventListener('click', () => setScreen('vendas'));
+    navProdutosProducts.addEventListener('click', () => {
+      if (currentUser && currentUser.role === 'admin') setScreen('produtos');
+    });
+    navFinanceiroProducts.addEventListener('click', () => {
+      if (currentUser && currentUser.role === 'admin') {
+        setScreen('financeiro');
+        loadFinancialReport();
+      }
+    });
+    navProdutosFinance.addEventListener('click', () => {
+      if (currentUser && currentUser.role === 'admin') setScreen('produtos');
+    });
     navFinanceiroAlt.addEventListener('click', () => {
       if (currentUser && currentUser.role === 'admin') {
         setScreen('financeiro');
@@ -579,18 +805,29 @@
       loadProducts(productSearch.value.trim());
     });
     document.getElementById('sale-button').addEventListener('click', registerSale);
+    document.getElementById('create-customer-button').addEventListener('click', createCustomer);
     document.getElementById('create-product-button').addEventListener('click', createProduct);
     document.getElementById('finance-button').addEventListener('click', loadFinancialReport);
     document.getElementById('logout-button').addEventListener('click', () => {
       clearToken();
-      resetSelectedProduct();
+      cart.clear();
+      renderCart();
       setStatus(loginStatus, '');
       setStatus(saleStatus, '');
       setScreen('login');
     });
     document.getElementById('logout-button-finance').addEventListener('click', () => {
       clearToken();
-      resetSelectedProduct();
+      cart.clear();
+      renderCart();
+      setStatus(loginStatus, '');
+      setStatus(saleStatus, '');
+      setScreen('login');
+    });
+    document.getElementById('logout-button-products').addEventListener('click', () => {
+      clearToken();
+      cart.clear();
+      renderCart();
       setStatus(loginStatus, '');
       setStatus(saleStatus, '');
       setScreen('login');
@@ -598,11 +835,8 @@
     document.getElementById('password').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') login();
     });
-    document.getElementById('sale-quantity').addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') registerSale();
-    });
-
     appNav.classList.add('hidden');
+    appNavProducts.classList.add('hidden');
     appNavFinance.classList.add('hidden');
 
     if (getToken()) {
@@ -611,14 +845,15 @@
           currentUser = user;
           updateNavigation();
           setScreen('vendas');
-          loadProducts();
+          productsList.innerHTML = '<li><span>Use a pesquisa para carregar produtos.</span></li>';
+          loadCustomers();
         })
         .catch(() => {
           clearToken();
           setScreen('login');
         });
     } else {
-      resetSelectedProduct();
+      renderCart();
       setScreen('login');
     }
   </script>

@@ -36,11 +36,19 @@ class ProductInput(BaseModel):
     categoria: str = Field(min_length=1, max_length=120)
     quantidade: int = Field(ge=0)
     preco: float = Field(ge=0)
+    preco_custo: float = Field(default=0, ge=0)
 
 
 class SaleInput(BaseModel):
-    produto_id: int = Field(gt=0)
-    quantidade: int = Field(gt=0)
+    produto_id: int | None = Field(default=None, gt=0)
+    quantidade: int | None = Field(default=None, gt=0)
+    itens: list[dict[str, int]] = Field(default_factory=list, max_length=100)
+    cliente_id: int | None = Field(default=None, gt=0)
+
+
+class CustomerInput(BaseModel):
+    nome: str = Field(min_length=1, max_length=160)
+    telefone: str = Field(default="", max_length=40)
 
 
 class UserInput(BaseModel):
@@ -172,6 +180,20 @@ def create_app(repository=None, token_secret=None):
         if not repository.delete_part(product_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado.")
 
+    @app.get("/customers")
+    def list_customers(q: str = "", user=Depends(require_permission("registrar_vendas"))):
+        return repository.load_customers(q)
+
+    @app.post("/customers", status_code=status.HTTP_201_CREATED)
+    def create_customer(
+        customer: CustomerInput,
+        user=Depends(require_permission("registrar_vendas")),
+    ):
+        created = repository.create_customer(customer.nome, customer.telefone)
+        if not created:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Nome de cliente inválido.")
+        return created
+
     @app.get("/sales")
     def list_sales(user=Depends(require_permission("registrar_vendas"))):
         return repository.load_sales()
@@ -181,9 +203,12 @@ def create_app(repository=None, token_secret=None):
         sale: SaleInput,
         user=Depends(require_permission("registrar_vendas")),
     ):
-        result = repository.register_sale(sale.produto_id, sale.quantidade, user["id"])
+        items = sale.itens
+        if not items and sale.produto_id is not None and sale.quantidade is not None:
+            items = [{"produto_id": sale.produto_id, "quantidade": sale.quantidade}]
+        result = repository.register_order(items, user["id"], sale.cliente_id)
         if not result:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Quantidade indisponível para venda.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cliente inválido ou quantidade indisponível para algum produto.")
         return result
 
     @app.get("/reports/sales")
@@ -211,7 +236,7 @@ def create_app(repository=None, token_secret=None):
                 continue
             filtered.append(sale)
         return {
-            "quantidade_vendas": len(filtered),
+            "quantidade_vendas": len({sale.get("pedido_id") or f"legado-{sale.get('id')}" for sale in filtered}),
             "unidades_vendidas": sum(sale["quantidade"] for sale in filtered),
             "valor_total": round(sum(sale["valor_total"] for sale in filtered), 2),
             "vendas": filtered,
