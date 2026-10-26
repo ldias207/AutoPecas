@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AutoPeças</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-soft: #1f2937;
+      --text: #e2e8f0;
+      --muted: #cbd5e1;
+      --primary: #3b82f6;
+      --accent: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+    }
+    .app-shell {
+      width: min(420px, 92vw);
+      background: var(--panel);
+      border-radius: 18px;
+      padding: 32px 28px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.45);
+    }
+    .brand {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 2.1rem;
+    }
+    .brand span {
+      color: var(--muted);
+      display: block;
+      margin-top: 8px;
+      font-size: 0.93rem;
+    }
+    .screen {
+      display: none;
+    }
+    .screen.active {
+      display: block;
+    }
+    label {
+      display: block;
+      margin: 12px 0 8px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    input, button {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      font-size: 1rem;
+    }
+    input {
+      padding: 12px 14px;
+      background: #f8fafc;
+      color: #111827;
+    }
+    button {
+      margin-top: 16px;
+      padding: 12px 14px;
+      background: var(--primary);
+      border: none;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: var(--warning);
+      color: #111827;
+    }
+    .hidden {
+      display: none;
+    }
+    .status {
+      margin-top: 14px;
+      min-height: 20px;
+      font-size: 0.9rem;
+      color: #fca5a5;
+    }
+    .panel {
+      background: var(--panel-soft);
+      border-radius: 12px;
+      padding: 18px;
+      margin-top: 18px;
+    }
+    .panel h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    .product-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .product-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+    }
+    .product-list li:last-child {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <section id="login-screen" class="screen active">
+      <div class="brand">
+        <h1>AutoPeças</h1>
+        <span>Login do vendedor</span>
+      </div>
+      <label for="username">Usuário</label>
+      <input id="username" type="text" placeholder="Digite seu usuário" />
+
+      <label for="password">Senha</label>
+      <input id="password" type="password" placeholder="Digite sua senha" />
+
+      <button id="login-button">Entrar</button>
+      <div id="login-status" class="status"></div>
+    </section>
+
+    <section id="products-screen" class="screen">
+      <div class="brand">
+        <h1>AutoPeças</h1>
+        <span>Consulta de estoque</span>
+      </div>
+      <div class="panel">
+        <h2>Produtos disponíveis</h2>
+        <input id="product-search" type="text" placeholder="Buscar por nome, marca ou categoria" />
+        <button id="search-button">Buscar</button>
+        <ul id="products-list" class="product-list"></ul>
+      </div>
+
+      <div class="panel">
+        <h2>Registrar venda</h2>
+        <div id="selected-product-label">Produto: nenhum</div>
+        <label for="sale-quantity">Quantidade</label>
+        <input id="sale-quantity" type="number" min="1" value="1" />
+        <button id="sale-button">Registrar venda</button>
+        <div id="sale-status" class="status"></div>
+      </div>
+
+      <div id="finance-panel" class="panel hidden">
+        <h2>Financeiro</h2>
+        <label for="finance-start">Data inicial</label>
+        <input id="finance-start" type="date" />
+        <label for="finance-end">Data final</label>
+        <input id="finance-end" type="date" />
+        <button id="finance-button">Consultar</button>
+        <div id="finance-summary" class="status"></div>
+        <ul id="finance-list" class="product-list"></ul>
+      </div>
+
+      <button id="logout-button" class="secondary">Sair</button>
+    </section>
+  </main>
+
+  <script>
+    const loginScreen = document.getElementById('login-screen');
+    const productsScreen = document.getElementById('products-screen');
+    const loginStatus = document.getElementById('login-status');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const productSearch = document.getElementById('product-search');
+    const productsList = document.getElementById('products-list');
+    const selectedProductLabel = document.getElementById('selected-product-label');
+    const saleQuantity = document.getElementById('sale-quantity');
+    const saleStatus = document.getElementById('sale-status');
+    const financePanel = document.getElementById('finance-panel');
+    const financeSummary = document.getElementById('finance-summary');
+    const financeList = document.getElementById('finance-list');
+    const financeStart = document.getElementById('finance-start');
+    const financeEnd = document.getElementById('finance-end');
+
+    const tokenKey = 'autopecas-token';
+    let selectedProductId = null;
+    let selectedProductName = '';
+    let selectedProduct = null;
+    let currentUser = null;
+
+    function setStatus(el, message, isError = false) {
+      el.textContent = message;
+      el.style.color = isError ? '#fca5a5' : '#86efac';
+    }
+
+    function setScreen(screen) {
+      loginScreen.classList.toggle('active', screen === 'login');
+      productsScreen.classList.toggle('active', screen === 'products');
+    }
+
+    function getToken() {
+      return localStorage.getItem(tokenKey);
+    }
+
+    function saveToken(token) {
+      localStorage.setItem(tokenKey, token);
+    }
+
+    function clearToken() {
+      localStorage.removeItem(tokenKey);
+      currentUser = null;
+      financePanel.classList.add('hidden');
+    }
+
+    async function apiFetch(url, options = {}) {
+      const token = getToken();
+      const headers = { ...(options.headers || {}) };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const response = await fetch(url, { ...options, headers });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || 'Erro na requisição');
+      }
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return response.json();
+      }
+      return response.text();
+    }
+
+    async function login() {
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value;
+      if (!username || !password) {
+        setStatus(loginStatus, 'Informe usuário e senha.', true);
+        return;
+      }
+
+      try {
+        const response = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || 'Credenciais inválidas');
+        }
+
+        saveToken(payload.access_token);
+        currentUser = await apiFetch('/auth/me');
+        financePanel.classList.toggle('hidden', currentUser.role !== 'admin');
+        setStatus(loginStatus, '');
+        usernameInput.value = '';
+        passwordInput.value = '';
+        loadProducts();
+      } catch (error) {
+        setStatus(loginStatus, error.message, true);
+      }
+    }
+
+    function resetSelectedProduct() {
+      selectedProductId = null;
+      selectedProductName = '';
+      selectedProduct = null;
+      selectedProductLabel.textContent = 'Produto: nenhum';
+      saleQuantity.value = '1';
+      saleQuantity.removeAttribute('max');
+    }
+
+    function selectProduct(product) {
+      selectedProductId = product.id;
+      selectedProductName = product.nome;
+      selectedProduct = product;
+      selectedProductLabel.textContent = `Produto: ${product.nome} (${product.quantidade} und.)`;
+      saleQuantity.value = '1';
+      saleQuantity.max = String(product.quantidade);
+      setStatus(saleStatus, '');
+    }
+
+    async function loadProducts(query = '') {
+      try {
+        const data = await apiFetch(`/products?q=${encodeURIComponent(query)}`);
+        productsList.innerHTML = '';
+        if (!data.length) {
+          resetSelectedProduct();
+          productsList.innerHTML = '<li><span>Nenhum produto encontrado.</span></li>';
+          setScreen('products');
+          return;
+        }
+
+        data.forEach((item) => {
+          const li = document.createElement('li');
+          li.style.cursor = 'pointer';
+          li.addEventListener('click', () => selectProduct(item));
+          const left = document.createElement('span');
+          const right = document.createElement('strong');
+          left.textContent = `${item.nome} (${item.quantidade} und.)`;
+          right.textContent = item.status;
+          li.appendChild(left);
+          li.appendChild(right);
+          productsList.appendChild(li);
+        });
+
+        if (selectedProductId !== null && !data.some((item) => item.id === selectedProductId)) {
+          resetSelectedProduct();
+        }
+
+        setScreen('products');
+      } catch (error) {
+        setStatus(loginStatus, error.message, true);
+        setScreen('login');
+      }
+    }
+
+    async function registerSale() {
+      if (!selectedProductId || !selectedProduct) {
+        setStatus(saleStatus, 'Selecione um produto antes de registrar a venda.', true);
+        return;
+      }
+
+      const quantity = Number(saleQuantity.value);
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        setStatus(saleStatus, 'Informe uma quantidade inteira maior que zero.', true);
+        return;
+      }
+
+      if (quantity > Number(selectedProduct.quantidade)) {
+        setStatus(saleStatus, `Quantidade indisponível. Estoque atual: ${selectedProduct.quantidade} unidade(s).`, true);
+        return;
+      }
+
+      try {
+        const response = await apiFetch('/sales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ produto_id: selectedProductId, quantidade: quantity })
+        });
+
+        setStatus(saleStatus, `Venda registrada: ${response.nome} | ${response.quantidade} unidade(s).`, false);
+        saleQuantity.value = '1';
+        resetSelectedProduct();
+        loadProducts(productSearch.value.trim());
+      } catch (error) {
+        setStatus(saleStatus, error.message, true);
+      }
+    }
+
+    async function loadFinancialReport() {
+      try {
+        const params = new URLSearchParams();
+        if (financeStart.value) params.set('data_inicio', financeStart.value);
+        if (financeEnd.value) params.set('data_fim', financeEnd.value);
+        const response = await apiFetch(`/reports/sales?${params.toString()}`);
+
+        financeSummary.innerHTML = `
+          <strong>Vendas:</strong> ${response.quantidade_vendas} | 
+          <strong>Unidades:</strong> ${response.unidades_vendidas} | 
+          <strong>Valor:</strong> R$ ${response.valor_total.toFixed(2)}
+        `;
+        financeList.innerHTML = '';
+
+        if (!response.vendas.length) {
+          financeList.innerHTML = '<li><span>Nenhuma venda no período.</span></li>';
+          return;
+        }
+
+        response.vendas.forEach((item) => {
+          const li = document.createElement('li');
+          const left = document.createElement('span');
+          const right = document.createElement('strong');
+          left.textContent = `${item.nome} · ${item.quantidade} und.`;
+          right.textContent = `R$ ${Number(item.valor_total).toFixed(2)}`;
+          li.appendChild(left);
+          li.appendChild(right);
+          financeList.appendChild(li);
+        });
+      } catch (error) {
+        financeSummary.textContent = error.message;
+        financeSummary.style.color = '#fca5a5';
+      }
+    }
+
+    document.getElementById('login-button').addEventListener('click', login);
+    document.getElementById('search-button').addEventListener('click', () => {
+      loadProducts(productSearch.value.trim());
+    });
+    document.getElementById('sale-button').addEventListener('click', registerSale);
+    document.getElementById('finance-button').addEventListener('click', loadFinancialReport);
+    document.getElementById('logout-button').addEventListener('click', () => {
+      clearToken();
+      resetSelectedProduct();
+      setStatus(loginStatus, '');
+      setStatus(saleStatus, '');
+      setScreen('login');
+    });
+    document.getElementById('password').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') login();
+    });
+    document.getElementById('sale-quantity').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') registerSale();
+    });
+
+    if (getToken()) {
+      apiFetch('/auth/me')
+        .then((user) => {
+          currentUser = user;
+          financePanel.classList.toggle('hidden', currentUser.role !== 'admin');
+          loadProducts();
+        })
+        .catch(() => {
+          clearToken();
+          setScreen('login');
+        });
+    } else {
+      resetSelectedProduct();
+      setScreen('login');
+    }
+  </script>
+</body>
+</html>

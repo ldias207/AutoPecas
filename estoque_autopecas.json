@@ -1,0 +1,11 @@
+[
+  {
+    "nome": "Junta do Cabeçote",
+    "marca": "MARCA TESTE",
+    "numero_fabrica": "1234-TPQ",
+    "categoria": "Juntas",
+    "quantidade": 3,
+    "preco": 123.8,
+    "status": "Disponível"
+  }
+]

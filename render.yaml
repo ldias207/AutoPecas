@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: autopecas
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn api:app --workers 2 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: AUTOPECAS_TOKEN_SECRET
+        generateValue: true
+      - key: PORT
+        value: 8000
